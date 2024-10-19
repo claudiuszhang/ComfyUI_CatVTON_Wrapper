@@ -16,7 +16,6 @@ class LS_CatVTON:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "mask": ("MASK",),
                 "refer_image": ("IMAGE",),
                 "mask_grow": ("INT", {"default": 25, "min": -999, "max": 999, "step": 1}),
                 "mixed_precision": (["fp32", "fp16", "bf16"], {"default": "fp16"}),
@@ -24,15 +23,18 @@ class LS_CatVTON:
                 "steps": ("INT", {"default": 40, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 14.0, "step": 0.1, "round": 0.01,},),
                 # "device": (device_list,),
+            },
+            "optional": {
+                "mask": ("MASK",),
             }
         }
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "catvton"
-    CATEGORY = '😺dzNodes/CatVTON Wrapper'
+    CATEGORY = 'CZNodes/CatVTON Wrapper'
 
-    def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg):
+    def catvton(self, image, refer_image, mask_grow, mixed_precision, seed, steps, cfg, mask=None):
 
         device = "cuda"
         catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
@@ -53,6 +55,18 @@ class LS_CatVTON:
             device=device
         )
 
+        # AutoMasker
+        automasker = AutoMasker(
+            densepose_ckpt=os.path.join(catvton_path, "DensePose"),
+            schp_ckpt=os.path.join(catvton_path, "SCHP"),
+            device='cuda', 
+        )
+                
+        if mask is None:
+            mask = automasker(
+                image,
+                refer_image
+            )['mask']
         if mask.dim() == 2:
             mask = torch.unsqueeze(mask, 0)
         mask = mask[0]
